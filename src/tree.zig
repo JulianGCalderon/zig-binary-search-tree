@@ -15,12 +15,13 @@ pub fn BinarySearchTree(comptime T: type) type {
 
         allocator: Allocator,
         root: ?*TNode = null,
-        less_than: *const fn (T, T) Comparison,
+        comparator: *const fn (T, T) Comparison,
+        size: usize = 0,
 
-        pub fn init(allocator: Allocator, comptime less_than: Comparator) Self {
+        pub fn init(allocator: Allocator, comptime comparator: Comparator) Self {
             return Self{
                 .allocator = allocator,
-                .less_than = less_than,
+                .comparator = comparator,
             };
         }
 
@@ -29,25 +30,49 @@ pub fn BinarySearchTree(comptime T: type) type {
                 root.deinit();
             }
         }
+
+        pub fn insert(self: *Self, element: T) !void {
+            if (self.root) |root| {
+                try root.insert(element);
+            } else {
+                self.root = try TNode.init(self.allocator, element, self.comparator);
+            }
+            self.size += 1;
+        }
+
+        pub fn contains(self: *Self, element: T) bool {
+            if (self.root) |root| {
+                return root.contains(element);
+            }
+
+            return false;
+        }
+
+        pub fn empty(self: *Self) bool {
+            return self.size == 0;
+        }
     };
 }
 
 pub fn Node(comptime T: type) type {
     return struct {
         const Self = @This();
+        const Comparator = *const fn (T, T) Comparison;
 
         element: T,
         left: ?*Self,
         right: ?*Self,
         allocator: Allocator,
+        comparator: Comparator,
 
-        pub fn init(allocator: Allocator, element: T) Self {
-            var self = allocator.create(Self);
+        pub fn init(allocator: Allocator, element: T, comparator: Comparator) !*Self {
+            var self = try allocator.create(Self);
 
             self.element = element;
             self.left = null;
             self.right = null;
             self.allocator = allocator;
+            self.comparator = comparator;
 
             return self;
         }
@@ -61,6 +86,30 @@ pub fn Node(comptime T: type) type {
             }
 
             self.allocator.destroy(self);
+        }
+
+        pub fn insert(self: *Self, element: T) !void {
+            if (self.comparator(self.element, element) == .Lesser) {
+                if (self.left) |left| {
+                    try left.insert(element);
+                } else {
+                    self.left = try Self.init(self.allocator, element, self.comparator);
+                }
+            } else {
+                if (self.right) |right| {
+                    try right.insert(element);
+                } else {
+                    self.right = try Self.init(self.allocator, element, self.comparator);
+                }
+            }
+        }
+
+        pub fn contains(self: *Self, element: T) bool {
+            switch (self.comparator(self.element, element)) {
+                Comparison.Equal => return true,
+                Comparison.Lesser => return (self.left orelse return false).contains(element),
+                Comparison.Greater => return (self.right orelse return false).contains(element),
+            }
         }
     };
 }
