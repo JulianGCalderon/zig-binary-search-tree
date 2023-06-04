@@ -85,3 +85,15 @@ test "Given an empty tree, can insert up to a complete 3-depth binary tree" {
         try testing.expect(bst.contains(element));
     }
 }
+
+test "Given an empty tree, can insert the same element twice" {
+    var bst = try tree_with_one_element(5);
+    defer bst.deinit();
+
+    try bst.insert(5);
+
+    try testing.expect(bst.contains(5));
+    const expected_size: usize = 2;
+    try testing.expectEqual(expected_size, bst.size);
+
+}
