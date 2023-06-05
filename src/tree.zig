@@ -1,7 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-pub const Error = error{ElementDoesNotExist};
+pub const AllocatorError = std.mem.Allocator.Error;
 
 pub const Comparison = enum {
     Lesser,
@@ -12,11 +12,11 @@ pub const Comparison = enum {
 pub fn BinarySearchTree(comptime T: type) type {
     return struct {
         const Self = @This();
-        const TNode = Node(T);
         const Comparator = *const fn (T, T) Comparison;
+        pub const Error = error{ElementDoesNotExist} || AllocatorError;
 
         allocator: Allocator,
-        root: ?*TNode = null,
+        root: ?*Node = null,
         comparator: *const fn (T, T) Comparison,
         size: usize = 0,
 
@@ -33,11 +33,11 @@ pub fn BinarySearchTree(comptime T: type) type {
             }
         }
 
-        pub fn insert(self: *Self, element: T) !void {
+        pub fn insert(self: *Self, element: T) Error!void {
             if (self.root) |root| {
                 try root.insert(element);
             } else {
-                self.root = try TNode.init(self.allocator, element, self.comparator);
+                self.root = try Node.init(self.allocator, element, self.comparator);
             }
             self.size += 1;
         }
@@ -62,111 +62,114 @@ pub fn BinarySearchTree(comptime T: type) type {
                 return Error.ElementDoesNotExist;
             }
         }
-    };
-}
 
-pub fn Node(comptime T: type) type {
-    return struct {
-        const Self = @This();
-        const Comparator = *const fn (T, T) Comparison;
+        const Node = struct {
+            element: T,
+            left: ?*Node,
+            right: ?*Node,
+            allocator: Allocator,
+            comparator: Comparator,
 
-        element: T,
-        left: ?*Self,
-        right: ?*Self,
-        allocator: Allocator,
-        comparator: Comparator,
+            pub fn init(allocator: Allocator, element: T, comparator: Comparator) Error!*Node {
+                var self = try allocator.create(Node);
 
-        pub fn init(allocator: Allocator, element: T, comparator: Comparator) !*Self {
-            var self = try allocator.create(Self);
+                self.element = element;
+                self.left = null;
+                self.right = null;
+                self.allocator = allocator;
+                self.comparator = comparator;
 
-            self.element = element;
-            self.left = null;
-            self.right = null;
-            self.allocator = allocator;
-            self.comparator = comparator;
-
-            return self;
-        }
-
-        pub fn deinit(self: *Self) void {
-            if (self.left) |left| {
-                left.deinit();
-            }
-            if (self.right) |right| {
-                right.deinit();
-            }
-
-            self.allocator.destroy(self);
-        }
-
-        pub fn insert(self: *Self, element: T) !void {
-            if (self.comparator(element, self.element) == .Lesser) {
-                if (self.left) |left| {
-                    try left.insert(element);
-                } else {
-                    self.left = try Self.init(self.allocator, element, self.comparator);
-                }
-            } else {
-                if (self.right) |right| {
-                    try right.insert(element);
-                } else {
-                    self.right = try Self.init(self.allocator, element, self.comparator);
-                }
-            }
-        }
-
-        pub fn contains(self: *Self, element: T) bool {
-            switch (self.comparator(element, self.element)) {
-                Comparison.Equal => return true,
-                Comparison.Lesser => return (self.left orelse return false).contains(element),
-                Comparison.Greater => return (self.right orelse return false).contains(element),
-            }
-        }
-
-        pub fn remove(self: *Self, element: T) !?*Self {
-            switch (self.comparator(element, self.element)) {
-                Comparison.Equal => {
-                    if (self.left) |left| {
-                        var max: *Self = undefined;
-                        self.left = left.extract_max(&max);
-                        max.left = self.left;
-                        max.right = self.right;
-                        self.allocator.destroy(self);
-                        return max;
-                    } else if (self.right) |right| {
-                        self.allocator.destroy(self);
-                        return right;
-                    } else {
-                        self.allocator.destroy(self);
-                        return null;
-                    }
-                },
-                Comparison.Greater => {
-                    if (self.right) |right| {
-                        self.right = try right.remove(element);
-                    } else {
-                        return Error.ElementDoesNotExist;
-                    }
-                },
-                Comparison.Lesser => {
-                    if (self.left) |left| {
-                        self.left = try left.remove(element);
-                    } else {
-                        return Error.ElementDoesNotExist;
-                    }
-                },
-            }
-            return self;
-        }
-
-        pub fn extract_max(self: *Self, store: **Self) ?*Self {
-            if (self.right) |right| {
-                self.right = right.extract_max(store);
                 return self;
-            } else {
-                store.* = self;
-                return self.left;
             }
-        }
+
+            pub fn deinit(self: *Node) void {
+                if (self.left) |left| {
+                    left.deinit();
+                }
+                if (self.right) |right| {
+                    right.deinit();
+                }
+
+                self.allocator.destroy(self);
+            }
+
+            pub fn destroy(self: *Node) void {
+                self.allocator.destroy(self);
+            }
+
+            pub fn insert(self: *Node, element: T) Error!void {
+                if (self.comparator(element, self.element) == .Lesser) {
+                    try self.insert_rec(&self.left, element);
+                } else {
+                    try self.insert_rec(&self.right, element);
+                }
+            }
+
+            pub fn insert_rec(self: *Node, node: *?*Node, element: T) Error!void {
+                if (node.*) |_node| {
+                    try _node.insert(element);
+                } else {
+                    node.* = try Node.init(self.allocator, element, self.comparator);
+                }
+            }
+
+            pub fn contains(self: *Node, element: T) bool {
+                switch (self.comparator(element, self.element)) {
+                    Comparison.Equal => return true,
+                    Comparison.Lesser => return (self.left orelse return false).contains(element),
+                    Comparison.Greater => return (self.right orelse return false).contains(element),
+                }
+            }
+
+            pub fn remove(self: *Node, element: T) Error!?*Node {
+                switch (self.comparator(element, self.element)) {
+                    Comparison.Equal => {
+                        return self.delete();
+                    },
+                    Comparison.Greater => {
+                        try self.remove_(&self.right, element);
+                    },
+                    Comparison.Lesser => {
+                        try self.remove_(&self.right, element);
+                    },
+                }
+                return self;
+            }
+
+            pub fn remove_(self: *Node, node: *?*Node, element: T) Error!void {
+                _ = self;
+                if (node.*) |_node| {
+                    node.* = try _node.remove(element);
+                } else {
+                    return Error.ElementDoesNotExist;
+                }
+            }
+
+            pub fn delete(self: *Node) ?*Node {
+                defer self.destroy();
+
+                if (self.left) |left| {
+                    var max: *Node = undefined;
+                    self.left = left.extract_max(&max);
+                    max.left = self.left;
+                    max.right = self.right;
+                    return max;
+                } else if (self.right) |right| {
+                    return right;
+                } else {
+                    return null;
+                }
+            }
+
+            pub fn extract_max(self: *Node, store: **Node) ?*Node {
+                if (self.right) |right| {
+                    self.right = right.extract_max(store);
+                    return self;
+                } else {
+                    store.* = self;
+                    return self.left;
+                }
+            }
+        };
     };
 }
