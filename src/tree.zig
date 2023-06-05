@@ -1,6 +1,8 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+pub const Error = error{ElementDoesNotExist};
+
 pub const Comparison = enum {
     Lesser,
     Greater,
@@ -50,6 +52,14 @@ pub fn BinarySearchTree(comptime T: type) type {
 
         pub fn empty(self: *Self) bool {
             return self.size == 0;
+        }
+
+        pub fn remove(self: *Self, element: T) Error!void {
+            if (self.root) |root| {
+                self.root = try root.remove(element);
+            } else {
+                return Error.ElementDoesNotExist;
+            }
         }
     };
 }
@@ -110,6 +120,15 @@ pub fn Node(comptime T: type) type {
                 Comparison.Lesser => return (self.left orelse return false).contains(element),
                 Comparison.Greater => return (self.right orelse return false).contains(element),
             }
+        }
+
+        pub fn remove(self: *Self, element: T) !?*Self {
+            if (self.comparator(self.element, element) == .Equal) {
+                self.allocator.destroy(self);
+                return null;
+            }
+
+            return self;
         }
     };
 }

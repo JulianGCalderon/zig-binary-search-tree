@@ -6,7 +6,6 @@ const Comparison = tree.Comparison;
 const testing = std.testing;
 const allocator = testing.allocator;
 
-
 fn comparator(e1: u8, e2: u8) Comparison {
     if (e1 < e2) {
         return Comparison.Lesser;
@@ -35,7 +34,6 @@ test "Given an empty tree, can insert an element" {
     var bst = try tree_with_one_element(5);
     defer bst.deinit();
 
-
     try testing.expect(bst.contains(5));
     try testing.expect(!bst.empty());
 
@@ -46,7 +44,6 @@ test "Given an empty tree, can insert an element" {
 test "Given a tree with one element, can insert a higher element" {
     var bst = try tree_with_one_element(5);
     defer bst.deinit();
-
 
     try bst.insert(10);
     try testing.expect(bst.contains(10));
@@ -60,7 +57,6 @@ test "Given a tree with one element, can insert a lower element" {
     var bst = try tree_with_one_element(5);
     defer bst.deinit();
 
-
     try bst.insert(0);
     try testing.expect(bst.contains(0));
     try testing.expect(bst.contains(5));
@@ -73,7 +69,7 @@ test "Given an empty tree, can insert up to a complete 3-depth binary tree" {
     var bst = new_tree();
     defer bst.deinit();
 
-    const elements = [_]u8{10, 12, 11, 13, 8, 9, 7};
+    const elements = [_]u8{ 10, 12, 11, 13, 8, 9, 7 };
 
     for (elements) |element| {
         try bst.insert(element);
@@ -95,5 +91,15 @@ test "Given an empty tree, can insert the same element twice" {
     try testing.expect(bst.contains(5));
     const expected_size: usize = 2;
     try testing.expectEqual(expected_size, bst.size);
+}
 
+test "Given a tree with one element, can remove it" {
+    var bst = try tree_with_one_element(5);
+    defer bst.deinit();
+
+    try bst.remove(5);
+
+    try testing.expect(!bst.contains(5));
+    const expected_size: usize = 1;
+    try testing.expectEqual(expected_size, bst.size);
 }
