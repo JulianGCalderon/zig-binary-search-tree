@@ -57,6 +57,7 @@ pub fn BinarySearchTree(comptime T: type) type {
         pub fn remove(self: *Self, element: T) Error!void {
             if (self.root) |root| {
                 self.root = try root.remove(element);
+                self.size -= 1;
             } else {
                 return Error.ElementDoesNotExist;
             }
@@ -99,7 +100,7 @@ pub fn Node(comptime T: type) type {
         }
 
         pub fn insert(self: *Self, element: T) !void {
-            if (self.comparator(self.element, element) == .Lesser) {
+            if (self.comparator(element, self.element) == .Lesser) {
                 if (self.left) |left| {
                     try left.insert(element);
                 } else {
@@ -115,7 +116,7 @@ pub fn Node(comptime T: type) type {
         }
 
         pub fn contains(self: *Self, element: T) bool {
-            switch (self.comparator(self.element, element)) {
+            switch (self.comparator(element, self.element)) {
                 Comparison.Equal => return true,
                 Comparison.Lesser => return (self.left orelse return false).contains(element),
                 Comparison.Greater => return (self.right orelse return false).contains(element),
@@ -123,12 +124,49 @@ pub fn Node(comptime T: type) type {
         }
 
         pub fn remove(self: *Self, element: T) !?*Self {
-            if (self.comparator(self.element, element) == .Equal) {
-                self.allocator.destroy(self);
-                return null;
+            switch (self.comparator(element, self.element)) {
+                Comparison.Equal => {
+                    if (self.left) |left| {
+                        var max: *Self = undefined;
+                        self.left = left.extract_max(&max);
+                        max.left = self.left;
+                        max.right = self.right;
+                        self.allocator.destroy(self);
+                        return max;
+                    } else if (self.right) |right| {
+                        self.allocator.destroy(self);
+                        return right;
+                    } else {
+                        self.allocator.destroy(self);
+                        return null;
+                    }
+                },
+                Comparison.Greater => {
+                    if (self.right) |right| {
+                        self.right = try right.remove(element);
+                    } else {
+                        return Error.ElementDoesNotExist;
+                    }
+                },
+                Comparison.Lesser => {
+                    if (self.left) |left| {
+                        self.left = try left.remove(element);
+                    } else {
+                        return Error.ElementDoesNotExist;
+                    }
+                },
             }
-
             return self;
+        }
+
+        pub fn extract_max(self: *Self, store: **Self) ?*Self {
+            if (self.right) |right| {
+                self.right = right.extract_max(store);
+                return self;
+            } else {
+                store.* = self;
+                return self.left;
+            }
         }
     };
 }
