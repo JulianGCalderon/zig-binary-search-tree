@@ -195,6 +195,7 @@ fn conditional_adder(element: u8, sum: *u8) bool {
     sum.* += element;
     return element != 10;
 }
+
 test "Given a full 3-depth tree, can iterate inorder until condition" {
     const elements = [_]u8{ 10, 8, 7, 9, 12, 11, 13 };
     var bst = try tree_with_elements(&elements);
