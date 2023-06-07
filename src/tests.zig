@@ -2,6 +2,7 @@ const std = @import("std");
 const tree = @import("tree.zig");
 
 const BinarySearchTree = tree.BinarySearchTree(u8);
+const Order = tree.Order;
 const Comparison = tree.Comparison;
 const testing = std.testing;
 const allocator = testing.allocator;
@@ -171,4 +172,61 @@ test "Given a tree with full 3-depth tree, can remove the central node" {
     try testing.expect(bst.contains(12));
     try testing.expect(bst.contains(11));
     try testing.expect(bst.contains(13));
+}
+
+fn adder(element: u8, sum: *u8) bool {
+    sum.* += element;
+    return true;
+}
+
+test "Given a full 3-depth tree, can iterate full tree" {
+    const elements = [_]u8{ 10, 8, 7, 9, 12, 11, 13 };
+    var bst = try tree_with_elements(&elements);
+    defer bst.deinit();
+
+    var sum: u8 = 0;
+    bst.for_each_element(Order.Inorder, &sum, adder);
+
+    const expected_sum: usize = 10 + 8 + 7 + 9 + 12 + 11 + 13;
+    try testing.expectEqual(expected_sum, sum);
+}
+
+fn conditional_adder(element: u8, sum: *u8) bool {
+    sum.* += element;
+    return element != 10;
+}
+test "Given a full 3-depth tree, can iterate inorder until condition" {
+    const elements = [_]u8{ 10, 8, 7, 9, 12, 11, 13 };
+    var bst = try tree_with_elements(&elements);
+    defer bst.deinit();
+
+    var sum: u8 = 0;
+    bst.for_each_element(Order.Inorder, &sum, conditional_adder);
+
+    const expected_sum: usize = 10 + 8 + 7 + 9;
+    try testing.expectEqual(expected_sum, sum);
+}
+
+test "Given a full 3-depth tree, can iterate preorder until condition" {
+    const elements = [_]u8{ 12, 10, 9, 11, 13 };
+    var bst = try tree_with_elements(&elements);
+    defer bst.deinit();
+
+    var sum: u8 = 0;
+    bst.for_each_element(Order.Preorder, &sum, conditional_adder);
+
+    const expected_sum: usize = 12 + 10;
+    try testing.expectEqual(expected_sum, sum);
+}
+
+test "Given a full 3-depth tree, can iterate postorder until condition" {
+    const elements = [_]u8{ 12, 10, 9, 11, 13 };
+    var bst = try tree_with_elements(&elements);
+    defer bst.deinit();
+
+    var sum: u8 = 0;
+    bst.for_each_element(Order.Postorder, &sum, conditional_adder);
+
+    const expected_sum: usize = 9 + 10 + 11;
+    try testing.expectEqual(expected_sum, sum);
 }

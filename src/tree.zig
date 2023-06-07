@@ -9,11 +9,18 @@ pub const Comparison = enum {
     Equal,
 };
 
+pub const Order = enum {
+    Inorder,
+    Preorder,
+    Postorder,
+};
+
+pub const Error = error{ElementDoesNotExist} || AllocatorError;
+
 pub fn BinarySearchTree(comptime T: type) type {
     return struct {
         const Self = @This();
         const Comparator = *const fn (T, T) Comparison;
-        pub const Error = error{ElementDoesNotExist} || AllocatorError;
 
         allocator: Allocator,
         root: ?*Node = null,
@@ -60,6 +67,17 @@ pub fn BinarySearchTree(comptime T: type) type {
                 self.size -= 1;
             } else {
                 return Error.ElementDoesNotExist;
+            }
+        }
+
+        pub fn for_each_element(self: *Self, order: Order, context: anytype, callback: *const fn (T, @TypeOf(context)) bool) void {
+            if (self.root) |root| {
+                var stop = false;
+                switch (order) {
+                    Order.Inorder => return root.for_each_element_inorder(&stop, context, callback),
+                    Order.Preorder => return root.for_each_element_preorder(&stop, context, callback),
+                    Order.Postorder => return root.for_each_element_postorder(&stop, context, callback),
+                }
             }
         }
 
@@ -168,6 +186,67 @@ pub fn BinarySearchTree(comptime T: type) type {
                 } else {
                     store.* = self;
                     return self.left;
+                }
+            }
+
+            pub fn for_each_element_inorder(self: *Node, stop: *bool, context: anytype, callback: *const fn (T, @TypeOf(context)) bool) void {
+                if (self.left) |left| {
+                    left.for_each_element_inorder(stop, context, callback);
+                    if (stop.*) {
+                        return;
+                    }
+                }
+                stop.* = !callback(self.element, context);
+                if (stop.*) {
+                    return;
+                }
+
+                if (self.right) |right| {
+                    right.for_each_element_inorder(stop, context, callback);
+                    if (stop.*) {
+                        return;
+                    }
+                }
+            }
+
+            pub fn for_each_element_preorder(self: *Node, stop: *bool, context: anytype, callback: *const fn (T, @TypeOf(context)) bool) void {
+                stop.* = !callback(self.element, context);
+                if (stop.*) {
+                    return;
+                }
+
+                if (self.left) |left| {
+                    left.for_each_element_preorder(stop, context, callback);
+                    if (stop.*) {
+                        return;
+                    }
+                }
+
+                if (self.right) |right| {
+                    right.for_each_element_preorder(stop, context, callback);
+                    if (stop.*) {
+                        return;
+                    }
+                }
+            }
+            pub fn for_each_element_postorder(self: *Node, stop: *bool, context: anytype, callback: *const fn (T, @TypeOf(context)) bool) void {
+                if (self.left) |left| {
+                    left.for_each_element_postorder(stop, context, callback);
+                    if (stop.*) {
+                        return;
+                    }
+                }
+
+                if (self.right) |right| {
+                    right.for_each_element_postorder(stop, context, callback);
+                    if (stop.*) {
+                        return;
+                    }
+                }
+
+                stop.* = !callback(self.element, context);
+                if (stop.*) {
+                    return;
                 }
             }
         };
